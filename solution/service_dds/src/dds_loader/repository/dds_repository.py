@@ -1,6 +1,268 @@
 from datetime import datetime
-
+import uuid
+from typing import List, Dict, Any
 from lib.pg import PgConnect
+
+class H_User:
+    user_id: str
+    load_dt: datetime
+    load_src: str
+
+class H_Product:
+    product_id: str
+    load_dt: datetime
+    load_src: str 
+
+class H_Category:
+    category_name: str
+    load_dt: datetime
+    load_src: str
+
+class H_Restaurant:
+    restaurant_id: str
+    load_dt: datetime
+    load_src: str
+
+class H_Order:
+    order_id: str
+    order_dt: datetime
+    load_dt: datetime
+    load_src: str
+
+class L_Order_product:
+    order_id: str
+    product_id: str
+    load_dt: datetime
+    load_src: str
+
+class L_Product_restaurant:
+    order_id: str
+    product_id: str
+    load_dt: datetime
+    load_src: str
+
+class L_Product_category:
+    product_id: str
+    category_name: str
+    load_dt: datetime
+    load_src: str
+
+class L_Order_user:
+    order_id: str
+    user_id: str
+    load_dt: datetime
+    load_src: str
+
+class S_User_names:
+    user_id: str
+    username: str
+    userlogin: str
+    load_dt: datetime
+    load_src: str
+
+class S_Product_names:
+    product_id: str
+    product_name: str
+    load_dt: datetime
+    load_src: str
+
+class S_Restaurant_names:
+    restaurant_id: str
+    restaurant_name: str
+    load_dt: datetime
+    load_src: str
+
+class S_Order_cost_insert:
+    order_id: str
+    order_cost: str
+    order_payment: str
+    load_dt: datetime
+    load_src: str
+
+class S_Order_status:
+    order_id: str
+    order_status: str
+    load_dt: datetime
+    load_src: str
+
+
+class OrderDdsBuilder:
+    def init(self, dict: Dict) -> None:
+        self._dict = dict
+        self.source_system = ""
+        self.order_ns_uuid = uuid.UUID('')
+
+    def _uuid(self, obj: Any) -> uuid.UUID:
+        return uuid.uuid5(namespace=self.order_ns_uuid, name=str(obj))
+
+    def h_user(self) -> H_User:
+        user_id = self._dict['user']
+        return H_User(
+            user_id=user_id,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+    def h_product(self) -> List[H_Product]:
+        products = []
+        for prod_dict in self._dict['products']:
+            prod_id = prod_dict['id']
+            products.append(
+                H_Product(
+                    product_id=prod_id,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products
+
+    def h_category(self) -> List[H_Category]:
+        products = []
+        for prod_dict in self._dict['products']:
+            category_name = prod_dict['category']
+            products.append(
+                H_Category(
+                    category_name=category_name,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products 
+
+    def h_restaurant(self) -> H_Restaurant:
+        restaurant_id = self._dict['restaurant']['id']
+        return H_Restaurant(
+            restaurant_id=restaurant_id,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+    def h_order(self) -> H_Order:
+        order_id = self._dict['id']
+        order_dt = self._dict['date'] 
+        return H_Order(
+            order_id=order_id,
+            order_dt=order_dt,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+    def l_order_product(self) -> L_Order_product:
+        order_id = self._dict['id']
+        products = []
+        for prod_dict in self._dict['products']:
+            product_id = prod_dict['id']
+            products.append(
+                L_Order_product(
+                    order_id=order_id,
+                    product_id=product_id,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products 
+
+    def l_product_restaurant(self) -> L_Product_restaurant:
+        restaurant_id = self._dict['restaurant']['id']
+        products = []
+        for prod_dict in self._dict['products']:
+            product_id = prod_dict['id']
+            products.append(
+                L_Product_restaurant(
+                    product_id=product_id,
+                    restaurant_id=restaurant_id,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products 
+
+    def l_product_category(self) -> L_Product_category:
+        restaurant_id = self._dict['restaurant']['id']
+        products = []
+        for prod_dict in self._dict['products']:
+            product_id = prod_dict['id']
+            products.append(
+                L_Product_category(
+                    product_id=product_id,
+                    restaurant_id=restaurant_id,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products 
+
+    def l_order_user(self) -> L_Order_user:
+        order_id = self._dict['id']
+        user_id = self._dict['user']['id'] 
+        return L_Order_user(
+            order_id=order_id,
+            user_id=user_id,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+    def s_user_names(self) -> S_User_names:
+        user_id = self._dict['user']['id']
+        username = self._dict['user']['name']
+        userlogin = self._dict['user']['login']
+        return S_User_names(
+            user_id=user_id,
+            username=username,
+            userlogin=userlogin,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+    
+
+    def s_product_names(self) -> S_Product_names:
+        products = []
+        for prod_dict in self._dict['products']:
+            product_id = prod_dict['id']
+            product_name = prod_dict["name"]
+            products.append(
+                S_Product_names(
+                    product_id=product_id,
+                    product_name=product_name,
+                    load_dt=datetime.utcnow(),
+                    load_src=self.source_system
+                )
+            )
+        return products 
+
+
+    def s_restaurant_names(self) -> S_Restaurant_names:
+        restaurant_id = self._dict['restaurant']['id']
+        restaurant_name = self._dict['restaurant']['name']
+        return S_Restaurant_names(
+            restaurant_id=restaurant_id,
+            restaurant_name=restaurant_name,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+
+    def s_order_cost(self) -> S_Order_cost_insert:
+        order_id = self._dict['id']
+        order_cost = self._dict['cost']
+        order_payment = self._dict['payment']
+        return S_Order_cost_insert(
+            order_id=order_id,
+            order_cost=order_cost,
+            order_payment=order_payment,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
+
+    def s_order_status(self) -> S_Order_status:
+        order_id = self._dict['id']
+        order_status = self._dict['status']
+        return S_Order_status(
+            order_id=order_id,
+            order_status=order_status,
+            load_dt=datetime.utcnow(),
+            load_src=self.source_system
+        )
 
 class DdsRepository:
     def __init__(self, db: PgConnect) -> None:

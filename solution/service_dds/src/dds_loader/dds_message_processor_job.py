@@ -1,91 +1,80 @@
-import json
-from logging import Logger
-from typing import List, Dict
 from datetime import datetime
+from logging import Logger
+from typing import Dict, List
 
 from lib.kafka_connect import KafkaConsumer, KafkaProducer
-from dds_loader.repository.dds_repository import DdsRepository
+
+from dds_loader.repository.dds_repository import DdsRepository, OrderDdsBuilder
+
 
 class DdsMessageProcessor:
     def __init__(self,
                  consumer: KafkaConsumer,
                  producer: KafkaProducer,
-                 dds_repository: DdsRepository,
-                 batch_size: int,
+                 dds: DdsRepository,
                  logger: Logger) -> None:
         self._consumer = consumer
         self._producer = producer
-        self._dds_repository = dds_repository
+        self._repository = dds
+
         self._logger = logger
-        self._batch_size = 100
 
-    # функция, которая будет вызываться по расписанию.
+        self._batch_size = 30
+
     def run(self) -> None:
-        # Пишем в лог, что джоб был запущен.
         self._logger.info(f"{datetime.utcnow()}: START")
-
-        load_dt = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-        load_src = 'stg-service-orders'
 
         for _ in range(self._batch_size):
             msg = self._consumer.consume()
             if not msg:
+                self._logger.info(f"{datetime.utcnow()}: NO messages. Quitting.")
                 break
 
-            self._logger.info(f"{datetime.utcnow()}: Message received")
+            self._logger.info(f"{datetime.utcnow()}: {msg}")
 
-            order = msg['payload']
+            order_dict = msg['payload']
+            builder = OrderDdsBuilder(order_dict)
 
-            order_id = order['id']
-            order_dt = order['date']
-            order_cost = order['cost']
-            order_payment = order['payment']
-            order_status = order['status']
+            self._load_hubs(builder)
+            self._load_links(builder)
+            self._load_sats(builder)
 
-            user_id = order["user"]["id"]
-            user_name = order["user"]["name"]
-            user_login = order["user"]["login"]
-
-            restaurant_id = order['restaurant']['id']
-            restaurant_name = order['restaurant']['name']
-
-            self._dds_repository.h_user_insert(user_id, load_dt, load_src)
-
-            self._dds_repository.h_restaurant_insert(restaurant_id, load_dt, load_src) 
-
-            self._dds_repository.h_order_insert(order_id, order_dt, load_dt, load_src) 
-
-            products = order['products']
-            
-            for product in products:
-                product_id = product["id"]
-                product_name = product["name"]
-                category_name = product["category"]
-
-                self._dds_repository.h_product_insert(product_id, product_name, load_dt, load_src)
-
-                self._dds_repository.h_category_insert(category_name, product_name, load_dt, load_src)
-
-
-            self._dds_repository.l_order_product_insert(order_id, product_id, load_dt, load_src)
-
-            self._dds_repository.l_product_restaurant_insert(product_id, restaurant_id, load_dt, load_src)
-
-            self._dds_repository.l_product_category_insert(product_id, category_name, load_dt, load_src)
-
-            self._dds_repository.l_order_user_insert(order_id, user_id, load_dt, load_src)
-            
-            self._dds_repository.s_user_names_insert(user_id, user_name, user_login, load_dt, load_src)
-
-            self._dds_repository.s_product_names_insert(product_id, product_name, load_dt, load_src)
-
-            self._dds_repository.s_restaurant_names_insert(restaurant_id, restaurant_name, load_dt, load_src)
-
-            self._dds_repository.s_order_cost_insert(order_id, order_cost, order_payment, restaurant_name, load_dt, load_src)
-
-            self._dds_repository.s_order_status_insert(order_id, order_status, load_dt, load_src)
-
+            self._logger.info(f"{datetime.utcnow()}: {msg}")
             self._producer.produce(msg)
-            self._logger.info(f"{datetime.utcnow()}. Message Sent")
 
         self._logger.info(f"{datetime.utcnow()}: FINISH")
+
+    def _load_hubs(self, builder: OrderDdsBuilder) -> None:
+
+        self._repository.h_user_insert(builder.h_user())
+
+        for p in builder.h_product():
+            self._repository.h_product_insert(p)
+
+        for c in builder.h_category():
+            self._repository.h_category_insert(c)
+
+        self._repository.h_restaurant_insert(builder.h_restaurant())
+
+        self._repository.h_order_insert(builder.h_order())
+
+    def _load_links(self, builder: OrderDdsBuilder) -> None:
+        self._repository.l_order_user_insert(builder.l_order_user())
+
+        for op_link in builder.l_order_product():
+            self._repository.l_order_product_insert(op_link)
+
+        for pr_link in builder.l_product_restaurant():
+            self._repository.l_product_restaurant_insert(pr_link)
+
+        for pc_link in builder.l_product_category():
+            self._repository.l_product_category_insert(pc_link)
+
+    def _load_sats(self, builder: OrderDdsBuilder) -> None:
+        self._repository.s_order_cost_insert(builder.s_order_cost())
+        self._repository.s_order_status_insert(builder.s_order_status())
+        self._repository.s_restaurant_names_insert(builder.s_restaurant_names())
+        self._repository.s_user_names_insert(builder.s_user_names())
+
+        for pn in builder.s_product_names():
+            self._repository.s_product_names_insert(pn)
